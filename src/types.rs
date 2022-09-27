@@ -2,7 +2,8 @@ use std::ffi::CString;
 
 use llvm_sys::{
     core::{
-        LLVMBuildCall, LLVMFunctionType, LLVMInt32Type, LLVMInt8Type, LLVMPointerType, LLVMVoidType,
+        LLVMBuildCall2, LLVMFunctionType, LLVMInt32Type, LLVMInt8Type, LLVMPointerType,
+        LLVMVoidType,
     },
     LLVMBuilder, LLVMType, LLVMValue,
 };
@@ -54,9 +55,7 @@ impl ValueType for () {
         unsafe { LLVMVoidType() }
     }
 
-    fn as_return_value(_value: *mut LLVMValue) -> Self::ReturnType {
-        ()
-    }
+    fn as_return_value(_value: *mut LLVMValue) -> Self::ReturnType {}
 }
 
 fn function_type(ret: *mut LLVMType, params: &[*mut LLVMType]) -> *mut LLVMType {
@@ -66,12 +65,14 @@ fn function_type(ret: *mut LLVMType, params: &[*mut LLVMType]) -> *mut LLVMType 
 fn build_call(
     builder: *mut LLVMBuilder,
     function: *mut LLVMValue,
+    function_type: *mut LLVMType,
     params: &[*mut LLVMValue],
 ) -> *mut LLVMValue {
     unsafe {
         let name = CString::new("").unwrap();
-        LLVMBuildCall(
+        LLVMBuildCall2(
             builder,
+            function_type,
             function,
             params.as_ptr() as *mut _,
             params.len() as u32,
@@ -96,7 +97,7 @@ where
         function: *mut LLVMValue,
         _: Self::Params,
     ) -> Self::Return {
-        R::as_return_value(build_call(builder, function, &[]))
+        R::as_return_value(build_call(builder, function, Self::function_type(), &[]))
     }
 }
 
@@ -117,6 +118,11 @@ where
         function: *mut LLVMValue,
         params: Self::Params,
     ) -> Self::Return {
-        R::as_return_value(build_call(builder, function, &[params.0.value()]))
+        R::as_return_value(build_call(
+            builder,
+            function,
+            Self::function_type(),
+            &[params.0.value()],
+        ))
     }
 }
