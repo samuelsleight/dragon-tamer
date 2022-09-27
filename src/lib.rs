@@ -1,5 +1,3 @@
-extern crate llvm_sys;
-
 mod block;
 mod builder;
 mod function;
