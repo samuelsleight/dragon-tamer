@@ -1,0 +1,8 @@
+[package]
+name = "dragon-tamer"
+authors = ["Samuel Sleight <samuel.sleight@gmail.com>"]
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+llvm-sys = "140"
