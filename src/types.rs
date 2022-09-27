@@ -76,7 +76,7 @@ fn build_call(
             function,
             params.as_ptr() as *mut _,
             params.len() as u32,
-            name.to_bytes_with_nul().as_ptr() as *const i8,
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
         )
     }
 }

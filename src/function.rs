@@ -27,7 +27,7 @@ impl<T: FunctionType> Function<T> {
         let name = CString::new(name.as_ref()).unwrap();
 
         let block = unsafe {
-            LLVMAppendBasicBlock(self.value, name.to_bytes_with_nul().as_ptr() as *const i8)
+            LLVMAppendBasicBlock(self.value, name.to_bytes_with_nul().as_ptr().cast::<i8>())
         };
 
         Block::new(block)

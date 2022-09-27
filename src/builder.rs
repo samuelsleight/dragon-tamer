@@ -48,7 +48,7 @@ impl Builder {
                 LLVMIntPredicate::LLVMIntEQ,
                 zero.value(),
                 value.value(),
-                name.to_bytes_with_nul().as_ptr() as *const i8,
+                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
             );
             LLVMBuildCondBr(self.builder, cmp, t.value(), f.value());
         }
@@ -61,7 +61,7 @@ impl Builder {
                 self.builder,
                 lhs.value(),
                 rhs.value(),
-                name.to_bytes_with_nul().as_ptr() as *const i8,
+                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
             ))
         }
     }
@@ -73,7 +73,7 @@ impl Builder {
                 self.builder,
                 lhs.value(),
                 rhs.value(),
-                name.to_bytes_with_nul().as_ptr() as *const i8,
+                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
             ))
         }
     }

@@ -37,12 +37,12 @@ impl Module {
         let source = CString::new(source.as_ref().as_os_str().to_str().unwrap()).unwrap();
 
         let module = unsafe {
-            let module = LLVMModuleCreateWithName(name.to_bytes_with_nul().as_ptr() as *const i8);
+            let module = LLVMModuleCreateWithName(name.to_bytes_with_nul().as_ptr().cast::<i8>());
 
             let source_bytes = source.to_bytes();
             LLVMSetSourceFileName(
                 module,
-                source_bytes.as_ptr() as *const i8,
+                source_bytes.as_ptr().cast::<i8>(),
                 source_bytes.len(),
             );
 
@@ -58,7 +58,7 @@ impl Module {
         let function = unsafe {
             LLVMAddFunction(
                 self.module,
-                name.to_bytes_with_nul().as_ptr() as *const i8,
+                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
                 T::function_type(),
             )
         };
@@ -77,12 +77,12 @@ impl Module {
                 LLVMAddGlobal(
                     self.module,
                     LLVMArrayType(LLVMInt8Type(), bytes.len() as u32),
-                    name.to_bytes_with_nul().as_ptr() as *const i8,
+                    name.to_bytes_with_nul().as_ptr().cast::<i8>(),
                 )
             }
         };
 
-        let value = unsafe { LLVMConstString(bytes.as_ptr() as *const i8, bytes.len() as u32, 1) };
+        let value = unsafe { LLVMConstString(bytes.as_ptr().cast::<i8>(), bytes.len() as u32, 1) };
 
         unsafe {
             LLVMSetLinkage(global, LLVMLinkage::LLVMInternalLinkage);
