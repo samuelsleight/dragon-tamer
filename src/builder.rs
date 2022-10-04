@@ -8,7 +8,7 @@ use llvm_sys::{
     LLVMBuilder, LLVMIntPredicate,
 };
 
-use crate::{Block, Function, FunctionType, Value};
+use crate::{value::Integer, Block, Function, FunctionType, Value, ValueType};
 
 pub struct Builder {
     builder: *mut LLVMBuilder,
@@ -39,14 +39,14 @@ impl Builder {
         function.build_call(self.builder, params)
     }
 
-    pub fn build_conditional_jump(&self, value: &Value<i32>, t: &Block, f: &Block) {
+    pub fn build_conditional_jump<T: Integer>(&self, value: &Value<T>, t: &Block, f: &Block) {
         unsafe {
-            let zero = Value::constant(0_i32);
+            let zero = T::zero();
             let name = CString::new("").unwrap();
             let cmp = LLVMBuildICmp(
                 self.builder,
                 LLVMIntPredicate::LLVMIntEQ,
-                zero.value(),
+                zero,
                 value.value(),
                 name.to_bytes_with_nul().as_ptr().cast::<i8>(),
             );
@@ -54,7 +54,7 @@ impl Builder {
         }
     }
 
-    pub fn build_add(&self, lhs: &Value<i32>, rhs: &Value<i32>) -> Value<i32> {
+    pub fn build_add<T: Integer>(&self, lhs: &Value<T>, rhs: &Value<T>) -> Value<T> {
         unsafe {
             let name = CString::new("").unwrap();
             Value::new(LLVMBuildAdd(
@@ -66,7 +66,7 @@ impl Builder {
         }
     }
 
-    pub fn build_sub(&self, lhs: &Value<i32>, rhs: &Value<i32>) -> Value<i32> {
+    pub fn build_sub<T: Integer>(&self, lhs: &Value<T>, rhs: &Value<T>) -> Value<T> {
         unsafe {
             let name = CString::new("").unwrap();
             Value::new(LLVMBuildSub(
@@ -79,8 +79,9 @@ impl Builder {
     }
 
     pub fn build_ret(&self) {
+    pub fn build_ret<T: ValueType>(&self, value: &Value<T>) {
         unsafe {
-            LLVMBuildRet(self.builder, Value::<i32>::constant(0).value());
+            LLVMBuildRet(self.builder, value.value());
         }
     }
 }
