@@ -3,7 +3,7 @@ use std::ffi::CString;
 use llvm_sys::{
     core::{
         LLVMBuildAdd, LLVMBuildCondBr, LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildLoad2, LLVMBuildRet,
-        LLVMBuildStore, LLVMBuildSub, LLVMCreateBuilder, LLVMDisposeBuilder,
+        LLVMBuildRetVoid, LLVMBuildStore, LLVMBuildSub, LLVMCreateBuilder, LLVMDisposeBuilder,
     },
     LLVMBuilder, LLVMIntPredicate,
 };
@@ -126,9 +126,40 @@ impl Builder {
         }
     }
 
+    pub fn build_index_store<T: ValueType, const N: usize, I: Integer>(
+        &self,
+        array: &Value<*mut [T; N]>,
+        index: &Value<I>,
+        value: &Value<T>,
+    ) {
+        let ep = unsafe {
+            let name = CString::new("").unwrap();
+            let mut indices = [I::zero(), index.value()];
+
+            LLVMBuildGEP2(
+                self.builder,
+                <[T; N] as ValueType>::value_type(),
+                array.value(),
+                indices.as_mut_ptr(),
+                2,
+                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+            )
+        };
+
+        unsafe {
+            LLVMBuildStore(self.builder, value.value(), ep);
+        }
+    }
+
     pub fn build_ret<T: ValueType>(&self, value: &Value<T>) {
         unsafe {
             LLVMBuildRet(self.builder, value.value());
+        }
+    }
+
+    pub fn build_void_ret(&self) {
+        unsafe {
+            LLVMBuildRetVoid(self.builder);
         }
     }
 }
