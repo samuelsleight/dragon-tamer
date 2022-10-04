@@ -23,6 +23,10 @@ impl<T: FunctionType> Function<T> {
         T::build_call(builder, self.value, params)
     }
 
+    pub fn params(&self) -> T::Params {
+        T::function_params(self.value)
+    }
+
     pub fn add_block<S: AsRef<str>>(&self, name: S) -> Block {
         let name = CString::new(name.as_ref()).unwrap();
 

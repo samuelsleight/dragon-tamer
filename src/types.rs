@@ -2,8 +2,8 @@ use std::ffi::CString;
 
 use llvm_sys::{
     core::{
-        LLVMArrayType, LLVMBuildCall2, LLVMFunctionType, LLVMInt32Type, LLVMInt64Type,
-        LLVMInt8Type, LLVMPointerType, LLVMVoidType,
+        LLVMArrayType, LLVMBuildCall2, LLVMFunctionType, LLVMGetParam, LLVMInt32Type,
+        LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMVoidType,
     },
     LLVMBuilder, LLVMType, LLVMValue,
 };
@@ -15,6 +15,9 @@ pub trait FunctionType {
     type Return;
 
     fn function_type() -> *mut LLVMType;
+
+    fn function_params(function: *mut LLVMValue) -> Self::Params;
+
     fn build_call(
         builder: *mut LLVMBuilder,
         function: *mut LLVMValue,
@@ -119,6 +122,8 @@ where
         function_type(R::value_type(), &[])
     }
 
+    fn function_params(function: *mut LLVMValue) -> Self::Params {}
+
     fn build_call(
         builder: *mut LLVMBuilder,
         function: *mut LLVMValue,
@@ -138,6 +143,10 @@ where
 
     fn function_type() -> *mut LLVMType {
         function_type(R::value_type(), &[T::value_type()])
+    }
+
+    fn function_params(function: *mut LLVMValue) -> Self::Params {
+        unsafe { (Value::new(LLVMGetParam(function, 0)),) }
     }
 
     fn build_call(
