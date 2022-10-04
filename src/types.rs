@@ -46,6 +46,9 @@ macro_rules! value_type {
 }
 
 value_type!(i32 => LLVMInt32Type());
+value_type!(i64 => LLVMInt64Type());
+value_type!(u32 => LLVMInt32Type());
+value_type!(u64 => LLVMInt32Type());
 value_type!(String => LLVMPointerType(LLVMInt8Type(), 0));
 
 impl ValueType for () {
