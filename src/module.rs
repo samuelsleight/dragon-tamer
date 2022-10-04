@@ -6,15 +6,19 @@ use std::{
 
 use llvm_sys::{
     core::{
-        LLVMAddFunction, LLVMAddGlobal, LLVMArrayType, LLVMConstBitCast, LLVMConstString,
-        LLVMDisposeMessage, LLVMDisposeModule, LLVMInt8Type, LLVMModuleCreateWithName,
-        LLVMPrintModuleToString, LLVMSetGlobalConstant, LLVMSetInitializer, LLVMSetLinkage,
-        LLVMSetSourceFileName,
+        LLVMAddFunction, LLVMAddGlobal, LLVMArrayType, LLVMConstArray, LLVMConstBitCast,
+        LLVMConstString, LLVMDisposeMessage, LLVMDisposeModule, LLVMInt8Type,
+        LLVMModuleCreateWithName, LLVMPrintModuleToString, LLVMSetGlobalConstant,
+        LLVMSetInitializer, LLVMSetLinkage, LLVMSetSourceFileName,
     },
     LLVMLinkage, LLVMModule,
 };
 
-use crate::{types::ValueType, Function, FunctionType, Value};
+use crate::{
+    types::ValueType,
+    value::{Constant, Integer},
+    Function, FunctionType, Value,
+};
 
 pub struct Module {
     module: *mut LLVMModule,
@@ -90,6 +94,55 @@ impl Module {
             LLVMSetInitializer(global, value);
 
             Value::new(LLVMConstBitCast(global, String::value_type()))
+        }
+    }
+
+    pub fn add_array<T: Integer, const N: usize>(&self) -> Value<*mut [T; N]> {
+        let global = {
+            let name = CString::new("array").unwrap();
+
+            unsafe {
+                LLVMAddGlobal(
+                    self.module,
+                    LLVMArrayType(T::value_type(), N as u32),
+                    name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+                )
+            }
+        };
+
+        unsafe {
+            LLVMSetLinkage(global, LLVMLinkage::LLVMInternalLinkage);
+            LLVMSetGlobalConstant(global, 0);
+
+            let mut vals = [T::zero(); N];
+            let value = LLVMConstArray(T::value_type(), vals.as_mut_ptr(), N as u32);
+            LLVMSetInitializer(global, value);
+
+            Value::new(global)
+        }
+    }
+
+    pub fn add_global<T: ValueType + Constant>(&self, value: T) -> Value<*mut T> {
+        let global = {
+            let name = CString::new("value").unwrap();
+
+            unsafe {
+                LLVMAddGlobal(
+                    self.module,
+                    T::value_type(),
+                    name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+                )
+            }
+        };
+
+        let value = value.constant();
+
+        unsafe {
+            LLVMSetLinkage(global, LLVMLinkage::LLVMInternalLinkage);
+            LLVMSetGlobalConstant(global, 0);
+            LLVMSetInitializer(global, value);
+
+            Value::new(global)
         }
     }
 }

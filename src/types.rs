@@ -2,8 +2,8 @@ use std::ffi::CString;
 
 use llvm_sys::{
     core::{
-        LLVMBuildCall2, LLVMFunctionType, LLVMInt32Type, LLVMInt8Type, LLVMPointerType,
-        LLVMVoidType,
+        LLVMArrayType, LLVMBuildCall2, LLVMFunctionType, LLVMInt32Type, LLVMInt64Type,
+        LLVMInt8Type, LLVMPointerType, LLVMVoidType,
     },
     LLVMBuilder, LLVMType, LLVMValue,
 };
@@ -59,6 +59,30 @@ impl ValueType for () {
     }
 
     fn as_return_value(_value: *mut LLVMValue) -> Self::ReturnType {}
+}
+
+impl<T: ValueType> ValueType for *mut T {
+    type ReturnType = Value<*mut T>;
+
+    fn value_type() -> *mut LLVMType {
+        unsafe { LLVMPointerType(T::value_type(), 0) }
+    }
+
+    fn as_return_value(value: *mut LLVMValue) -> Self::ReturnType {
+        Value::<Self>::new(value)
+    }
+}
+
+impl<T: ValueType, const N: usize> ValueType for [T; N] {
+    type ReturnType = Value<[T; N]>;
+
+    fn value_type() -> *mut LLVMType {
+        unsafe { LLVMArrayType(T::value_type(), N as u32) }
+    }
+
+    fn as_return_value(value: *mut LLVMValue) -> Self::ReturnType {
+        Value::<Self>::new(value)
+    }
 }
 
 fn function_type(ret: *mut LLVMType, params: &[*mut LLVMType]) -> *mut LLVMType {

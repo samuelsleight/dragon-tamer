@@ -2,8 +2,8 @@ use std::ffi::CString;
 
 use llvm_sys::{
     core::{
-        LLVMBuildAdd, LLVMBuildCondBr, LLVMBuildICmp, LLVMBuildRet, LLVMBuildSub,
-        LLVMCreateBuilder, LLVMDisposeBuilder,
+        LLVMBuildAdd, LLVMBuildCondBr, LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildLoad2, LLVMBuildRet,
+        LLVMBuildStore, LLVMBuildSub, LLVMCreateBuilder, LLVMDisposeBuilder,
     },
     LLVMBuilder, LLVMIntPredicate,
 };
@@ -78,7 +78,54 @@ impl Builder {
         }
     }
 
-    pub fn build_ret(&self) {
+    pub fn build_load<T: ValueType>(&self, ptr: &Value<*mut T>) -> Value<T> {
+        unsafe {
+            let name = CString::new("").unwrap();
+            Value::new(LLVMBuildLoad2(
+                self.builder,
+                T::value_type(),
+                ptr.value(),
+                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+            ))
+        }
+    }
+
+    pub fn build_store<T: ValueType>(&self, ptr: &Value<*mut T>, value: &Value<T>) {
+        unsafe {
+            LLVMBuildStore(self.builder, value.value(), ptr.value());
+        }
+    }
+
+    pub fn build_index_load<T: ValueType, const N: usize, I: Integer>(
+        &self,
+        array: &Value<*mut [T; N]>,
+        index: &Value<I>,
+    ) -> Value<T> {
+        let ep = unsafe {
+            let name = CString::new("").unwrap();
+            let mut indices = [I::zero(), index.value()];
+
+            LLVMBuildGEP2(
+                self.builder,
+                <[T; N] as ValueType>::value_type(),
+                array.value(),
+                indices.as_mut_ptr(),
+                2,
+                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+            )
+        };
+
+        unsafe {
+            let name = CString::new("").unwrap();
+            Value::new(LLVMBuildLoad2(
+                self.builder,
+                T::value_type(),
+                ep,
+                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+            ))
+        }
+    }
+
     pub fn build_ret<T: ValueType>(&self, value: &Value<T>) {
         unsafe {
             LLVMBuildRet(self.builder, value.value());
