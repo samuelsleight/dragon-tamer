@@ -8,7 +8,9 @@ use llvm_sys::{
     LLVMBuilder, LLVMIntPredicate,
 };
 
-use crate::{value::Integer, Block, Function, FunctionType, Value, ValueType};
+use crate::{
+    jump_table::JumpTable, value::Integer, Block, Function, FunctionType, Value, ValueType,
+};
 
 pub struct Builder {
     builder: *mut LLVMBuilder,
@@ -149,6 +151,15 @@ impl Builder {
         unsafe {
             LLVMBuildStore(self.builder, value.value(), ep);
         }
+    }
+
+    pub fn build_jump_table<'a, 'b, T: ValueType>(
+    pub fn build_jump_table<T: ValueType>(
+        &self,
+        switch: &Value<T>,
+        default: &Block,
+    ) -> JumpTable<T> {
+        JumpTable::new(self.builder, switch.value(), default)
     }
 
     pub fn build_ret<T: ValueType>(&self, value: &Value<T>) {

@@ -1,6 +1,7 @@
 mod block;
 mod builder;
 mod function;
+mod jump_table;
 mod module;
 mod types;
 mod value;

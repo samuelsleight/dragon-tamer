@@ -1,5 +1,6 @@
 use llvm_sys::{core::LLVMPositionBuilderAtEnd, LLVMBasicBlock, LLVMBuilder};
 
+#[derive(Copy, Clone)]
 pub struct Block {
     value: *mut LLVMBasicBlock,
 }
