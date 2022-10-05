@@ -6,6 +6,7 @@ use crate::{Block, FunctionType};
 
 use std::ffi::CString;
 
+#[derive(Copy, Clone)]
 pub struct Function<T: FunctionType> {
     value: *mut LLVMValue,
     phantom: PhantomData<T>,

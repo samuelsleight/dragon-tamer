@@ -33,7 +33,7 @@ constant!(i64);
 constant!(u32);
 constant!(u64);
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub struct Value<T: ValueType + ?Sized> {
     value: *mut LLVMValue,
     phantom: PhantomData<T>,
