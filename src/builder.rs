@@ -2,8 +2,9 @@ use std::ffi::CString;
 
 use llvm_sys::{
     core::{
-        LLVMBuildAdd, LLVMBuildCondBr, LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildLoad2, LLVMBuildRet,
-        LLVMBuildRetVoid, LLVMBuildStore, LLVMBuildSub, LLVMCreateBuilder, LLVMDisposeBuilder,
+        LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildBr, LLVMBuildCondBr, LLVMBuildGEP2, LLVMBuildICmp,
+        LLVMBuildLoad2, LLVMBuildRet, LLVMBuildRetVoid, LLVMBuildStore, LLVMBuildStructGEP2,
+        LLVMBuildSub, LLVMBuildUnreachable, LLVMCreateBuilder, LLVMDisposeBuilder,
     },
     LLVMBuilder, LLVMIntPredicate,
 };
@@ -39,6 +40,12 @@ impl Builder {
         params: T::Params,
     ) -> T::Return {
         function.build_call(self.builder, params)
+    }
+
+    pub fn build_jump(&self, block: &Block) {
+        unsafe {
+            LLVMBuildBr(self.builder, block.value());
+        }
     }
 
     pub fn build_conditional_jump<T: Integer>(&self, value: &Value<T>, t: &Block, f: &Block) {
@@ -153,7 +160,53 @@ impl Builder {
         }
     }
 
-    pub fn build_jump_table<'a, 'b, T: ValueType>(
+    pub fn build_struct<A: ValueType, B: ValueType>(
+        &self,
+        a: &Value<A>,
+        b: &Value<B>,
+    ) -> Value<*mut (A, B)> {
+        let value = unsafe {
+            let name = CString::new("").unwrap();
+
+            LLVMBuildAlloca(
+                self.builder,
+                <(A, B) as ValueType>::value_type(),
+                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+            )
+        };
+
+        let first_ep = unsafe {
+            let name = CString::new("").unwrap();
+
+            LLVMBuildStructGEP2(
+                self.builder,
+                <(A, B) as ValueType>::value_type(),
+                value,
+                0,
+                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+            )
+        };
+
+        let second_ep = unsafe {
+            let name = CString::new("").unwrap();
+
+            LLVMBuildStructGEP2(
+                self.builder,
+                <(A, B) as ValueType>::value_type(),
+                value,
+                1,
+                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+            )
+        };
+
+        unsafe {
+            LLVMBuildStore(self.builder, a.value(), first_ep);
+            LLVMBuildStore(self.builder, b.value(), second_ep);
+        }
+
+        Value::new(value)
+    }
+
     pub fn build_jump_table<T: ValueType>(
         &self,
         switch: &Value<T>,
