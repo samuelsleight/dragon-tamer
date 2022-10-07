@@ -3,8 +3,9 @@ use std::ffi::CString;
 use llvm_sys::{
     core::{
         LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildBr, LLVMBuildCondBr, LLVMBuildGEP2, LLVMBuildICmp,
-        LLVMBuildLoad2, LLVMBuildRet, LLVMBuildRetVoid, LLVMBuildStore, LLVMBuildStructGEP2,
-        LLVMBuildSub, LLVMBuildUnreachable, LLVMCreateBuilder, LLVMDisposeBuilder,
+        LLVMBuildIntCast, LLVMBuildLoad2, LLVMBuildRet, LLVMBuildRetVoid, LLVMBuildStore,
+        LLVMBuildStructGEP2, LLVMBuildSub, LLVMBuildUnreachable, LLVMCreateBuilder,
+        LLVMDisposeBuilder,
     },
     LLVMBuilder, LLVMIntPredicate,
 };
@@ -78,10 +79,32 @@ impl Builder {
     pub fn build_sub<T: Integer>(&self, lhs: &Value<T>, rhs: &Value<T>) -> Value<T> {
         unsafe {
             let name = CString::new("").unwrap();
+
             Value::new(LLVMBuildSub(
                 self.builder,
                 lhs.value(),
                 rhs.value(),
+                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+            ))
+        }
+    }
+
+    pub fn build_eq<T: Integer>(&self, lhs: &Value<T>, rhs: &Value<T>) -> Value<T> {
+        unsafe {
+            let name = CString::new("").unwrap();
+
+            let result = LLVMBuildICmp(
+                self.builder,
+                LLVMIntPredicate::LLVMIntEQ,
+                lhs.value(),
+                rhs.value(),
+                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+            );
+
+            Value::new(LLVMBuildIntCast(
+                self.builder,
+                result,
+                T::value_type(),
                 name.to_bytes_with_nul().as_ptr().cast::<i8>(),
             ))
         }
