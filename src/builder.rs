@@ -162,6 +162,12 @@ impl Builder {
         JumpTable::new(self.builder, switch.value(), default)
     }
 
+    pub fn build_unreachable(&self) {
+        unsafe {
+            LLVMBuildUnreachable(self.builder);
+        }
+    }
+
     pub fn build_ret<T: ValueType>(&self, value: &Value<T>) {
         unsafe {
             LLVMBuildRet(self.builder, value.value());
