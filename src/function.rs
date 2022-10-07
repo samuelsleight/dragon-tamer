@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use llvm_sys::{core::LLVMAppendBasicBlock, LLVMBuilder, LLVMValue};
 
-use crate::{Block, FunctionType};
+use crate::{Block, FunctionType, Value, ValueType};
 
 use std::ffi::CString;
 
@@ -36,5 +36,12 @@ impl<T: FunctionType> Function<T> {
         };
 
         Block::new(block)
+    }
+
+    pub fn as_value(&self) -> Value<T>
+    where
+        T: ValueType,
+    {
+        Value::new(self.value)
     }
 }
