@@ -33,27 +33,30 @@ impl Builder {
     }
 
     pub fn build_call<T: FunctionType>(
-        &self,
+        self,
         function: &Function<T>,
         params: T::Params,
-    ) -> T::Return {
-        function.build_call(self.builder, params)
+    ) -> (T::Return, Self) {
+        (function.build_call(self.builder, params), self)
     }
 
-    pub fn build_add<T: Integer>(&self, lhs: &Value<T>, rhs: &Value<T>) -> Value<T> {
-        unsafe {
+    pub fn build_add<T: Integer>(self, lhs: &Value<T>, rhs: &Value<T>) -> (Value<T>, Self) {
+        let value = unsafe {
             let name = CString::new("").unwrap();
+
             Value::new(LLVMBuildAdd(
                 self.builder,
                 lhs.value(),
                 rhs.value(),
                 name.to_bytes_with_nul().as_ptr().cast::<i8>(),
             ))
-        }
+        };
+
+        (value, self)
     }
 
-    pub fn build_sub<T: Integer>(&self, lhs: &Value<T>, rhs: &Value<T>) -> Value<T> {
-        unsafe {
+    pub fn build_sub<T: Integer>(self, lhs: &Value<T>, rhs: &Value<T>) -> (Value<T>, Self) {
+        let value = unsafe {
             let name = CString::new("").unwrap();
 
             Value::new(LLVMBuildSub(
@@ -62,11 +65,13 @@ impl Builder {
                 rhs.value(),
                 name.to_bytes_with_nul().as_ptr().cast::<i8>(),
             ))
-        }
+        };
+
+        (value, self)
     }
 
-    pub fn build_eq<T: Integer>(&self, lhs: &Value<T>, rhs: &Value<T>) -> Value<T> {
-        unsafe {
+    pub fn build_eq<T: Integer>(self, lhs: &Value<T>, rhs: &Value<T>) -> (Value<T>, Self) {
+        let value = unsafe {
             let name = CString::new("").unwrap();
 
             let result = LLVMBuildICmp(
@@ -83,32 +88,39 @@ impl Builder {
                 T::value_type(),
                 name.to_bytes_with_nul().as_ptr().cast::<i8>(),
             ))
-        }
+        };
+
+        (value, self)
     }
 
-    pub fn build_load<T: ValueType>(&self, ptr: &Value<*mut T>) -> Value<T> {
-        unsafe {
+    pub fn build_load<T: ValueType>(self, ptr: &Value<*mut T>) -> (Value<T>, Self) {
+        let value = unsafe {
             let name = CString::new("").unwrap();
+
             Value::new(LLVMBuildLoad2(
                 self.builder,
                 T::value_type(),
                 ptr.value(),
                 name.to_bytes_with_nul().as_ptr().cast::<i8>(),
             ))
-        }
+        };
+
+        (value, self)
     }
 
-    pub fn build_store<T: ValueType>(&self, ptr: &Value<*mut T>, value: &Value<T>) {
+    pub fn build_store<T: ValueType>(self, ptr: &Value<*mut T>, value: &Value<T>) -> Self {
         unsafe {
             LLVMBuildStore(self.builder, value.value(), ptr.value());
         }
+
+        self
     }
 
     pub fn build_index_load<T: ValueType, const N: usize, I: Integer>(
-        &self,
+        self,
         array: &Value<*mut [T; N]>,
         index: &Value<I>,
-    ) -> Value<T> {
+    ) -> (Value<T>, Self) {
         let ep = unsafe {
             let name = CString::new("").unwrap();
             let mut indices = [I::zero(), index.value()];
@@ -123,23 +135,26 @@ impl Builder {
             )
         };
 
-        unsafe {
+        let value = unsafe {
             let name = CString::new("").unwrap();
+
             Value::new(LLVMBuildLoad2(
                 self.builder,
                 T::value_type(),
                 ep,
                 name.to_bytes_with_nul().as_ptr().cast::<i8>(),
             ))
-        }
+        };
+
+        (value, self)
     }
 
     pub fn build_index_store<T: ValueType, const N: usize, I: Integer>(
-        &self,
+        self,
         array: &Value<*mut [T; N]>,
         index: &Value<I>,
         value: &Value<T>,
-    ) {
+    ) -> Self {
         let ep = unsafe {
             let name = CString::new("").unwrap();
             let mut indices = [I::zero(), index.value()];
@@ -157,13 +172,15 @@ impl Builder {
         unsafe {
             LLVMBuildStore(self.builder, value.value(), ep);
         }
+
+        self
     }
 
     pub fn build_struct<A: ValueType, B: ValueType>(
-        &self,
+        self,
         a: &Value<A>,
         b: &Value<B>,
-    ) -> Value<*mut (A, B)> {
+    ) -> (Value<*mut (A, B)>, Self) {
         let value = unsafe {
             let name = CString::new("").unwrap();
 
@@ -203,7 +220,7 @@ impl Builder {
             LLVMBuildStore(self.builder, b.value(), second_ep);
         }
 
-        Value::new(value)
+        (Value::new(value), self)
     }
 
     pub fn build_jump_table<T: ValueType>(
