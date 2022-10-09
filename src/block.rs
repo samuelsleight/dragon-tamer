@@ -1,4 +1,6 @@
-use llvm_sys::{core::LLVMPositionBuilderAtEnd, LLVMBasicBlock, LLVMBuilder};
+use llvm_sys::{core::LLVMPositionBuilderAtEnd, LLVMBasicBlock};
+
+use crate::Builder;
 
 #[derive(Copy, Clone)]
 pub struct Block {
@@ -10,10 +12,14 @@ impl Block {
         Self { value }
     }
 
-    pub(crate) fn set_to_builder(&self, builder: *mut LLVMBuilder) {
+    pub fn build(&self) -> Builder {
+        let builder = Builder::new();
+
         unsafe {
-            LLVMPositionBuilderAtEnd(builder, self.value);
+            LLVMPositionBuilderAtEnd(builder.builder, self.value);
         }
+
+        builder
     }
 
     pub(crate) fn value(&self) -> *mut LLVMBasicBlock {

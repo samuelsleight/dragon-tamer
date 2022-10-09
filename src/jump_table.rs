@@ -2,18 +2,19 @@ use std::marker::PhantomData;
 
 use llvm_sys::{
     core::{LLVMAddCase, LLVMBuildSwitch},
-    LLVMBasicBlock, LLVMBuilder, LLVMValue,
+    LLVMBasicBlock, LLVMValue,
 };
 
-use crate::{Block, Value, ValueType};
+use crate::{Block, Builder, Value, ValueType};
 
 struct Case {
     value: *mut LLVMValue,
     block: *mut LLVMBasicBlock,
 }
 
+#[must_use]
 pub struct JumpTable<T: ValueType> {
-    builder: *mut LLVMBuilder,
+    builder: Builder,
     value: *mut LLVMValue,
     default: *mut LLVMBasicBlock,
     cases: Vec<Case>,
@@ -30,7 +31,7 @@ impl Case {
 }
 
 impl<T: ValueType> JumpTable<T> {
-    pub(crate) fn new(builder: *mut LLVMBuilder, value: *mut LLVMValue, default: &Block) -> Self {
+    pub(crate) fn new(builder: Builder, value: *mut LLVMValue, default: &Block) -> Self {
         Self {
             builder,
             value,
@@ -48,7 +49,7 @@ impl<T: ValueType> JumpTable<T> {
     pub fn finish(self) {
         unsafe {
             let switch = LLVMBuildSwitch(
-                self.builder,
+                self.builder.builder,
                 self.value,
                 self.default,
                 self.cases.len() as u32,

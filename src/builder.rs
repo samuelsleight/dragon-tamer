@@ -14,8 +14,9 @@ use crate::{
     jump_table::JumpTable, value::Integer, Block, Function, FunctionType, Value, ValueType,
 };
 
+#[must_use]
 pub struct Builder {
-    builder: *mut LLVMBuilder,
+    pub(crate) builder: *mut LLVMBuilder,
 }
 
 impl Default for Builder {
@@ -25,14 +26,10 @@ impl Default for Builder {
 }
 
 impl Builder {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let builder = unsafe { LLVMCreateBuilder() };
 
         Self { builder }
-    }
-
-    pub fn set_block(&self, block: &Block) {
-        block.set_to_builder(self.builder);
     }
 
     pub fn build_call<T: FunctionType>(
@@ -41,27 +38,6 @@ impl Builder {
         params: T::Params,
     ) -> T::Return {
         function.build_call(self.builder, params)
-    }
-
-    pub fn build_jump(&self, block: &Block) {
-        unsafe {
-            LLVMBuildBr(self.builder, block.value());
-        }
-    }
-
-    pub fn build_conditional_jump<T: Integer>(&self, value: &Value<T>, t: &Block, f: &Block) {
-        unsafe {
-            let zero = T::zero();
-            let name = CString::new("").unwrap();
-            let cmp = LLVMBuildICmp(
-                self.builder,
-                LLVMIntPredicate::LLVMIntEQ,
-                zero,
-                value.value(),
-                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
-            );
-            LLVMBuildCondBr(self.builder, cmp, t.value(), f.value());
-        }
     }
 
     pub fn build_add<T: Integer>(&self, lhs: &Value<T>, rhs: &Value<T>) -> Value<T> {
@@ -231,26 +207,47 @@ impl Builder {
     }
 
     pub fn build_jump_table<T: ValueType>(
-        &self,
+        self,
         switch: &Value<T>,
         default: &Block,
     ) -> JumpTable<T> {
-        JumpTable::new(self.builder, switch.value(), default)
+        JumpTable::new(self, switch.value(), default)
     }
 
-    pub fn build_unreachable(&self) {
+    pub fn build_unreachable(self) {
         unsafe {
             LLVMBuildUnreachable(self.builder);
         }
     }
 
-    pub fn build_ret<T: ValueType>(&self, value: &Value<T>) {
+    pub fn build_jump(self, block: &Block) {
+        unsafe {
+            LLVMBuildBr(self.builder, block.value());
+        }
+    }
+
+    pub fn build_conditional_jump<T: Integer>(self, value: &Value<T>, t: &Block, f: &Block) {
+        unsafe {
+            let zero = T::zero();
+            let name = CString::new("").unwrap();
+            let cmp = LLVMBuildICmp(
+                self.builder,
+                LLVMIntPredicate::LLVMIntEQ,
+                zero,
+                value.value(),
+                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+            );
+            LLVMBuildCondBr(self.builder, cmp, t.value(), f.value());
+        }
+    }
+
+    pub fn build_ret<T: ValueType>(self, value: &Value<T>) {
         unsafe {
             LLVMBuildRet(self.builder, value.value());
         }
     }
 
-    pub fn build_void_ret(&self) {
+    pub fn build_void_ret(self) {
         unsafe {
             LLVMBuildRetVoid(self.builder);
         }
