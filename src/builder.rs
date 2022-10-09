@@ -37,82 +37,27 @@ impl Builder {
         function: &Function<T>,
         params: T::Params,
     ) -> (T::Return, Self) {
-        (function.build_call(self.builder, params), self)
+        (build_call(self.builder, function, params), self)
     }
 
     pub fn build_add<T: Integer>(self, lhs: &Value<T>, rhs: &Value<T>) -> (Value<T>, Self) {
-        let value = unsafe {
-            let name = CString::new("").unwrap();
-
-            Value::new(LLVMBuildAdd(
-                self.builder,
-                lhs.value(),
-                rhs.value(),
-                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
-            ))
-        };
-
-        (value, self)
+        (build_add(self.builder, lhs, rhs), self)
     }
 
     pub fn build_sub<T: Integer>(self, lhs: &Value<T>, rhs: &Value<T>) -> (Value<T>, Self) {
-        let value = unsafe {
-            let name = CString::new("").unwrap();
-
-            Value::new(LLVMBuildSub(
-                self.builder,
-                lhs.value(),
-                rhs.value(),
-                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
-            ))
-        };
-
-        (value, self)
+        (build_sub(self.builder, lhs, rhs), self)
     }
 
     pub fn build_eq<T: Integer>(self, lhs: &Value<T>, rhs: &Value<T>) -> (Value<T>, Self) {
-        let value = unsafe {
-            let name = CString::new("").unwrap();
-
-            let result = LLVMBuildICmp(
-                self.builder,
-                LLVMIntPredicate::LLVMIntEQ,
-                lhs.value(),
-                rhs.value(),
-                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
-            );
-
-            Value::new(LLVMBuildIntCast(
-                self.builder,
-                result,
-                T::value_type(),
-                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
-            ))
-        };
-
-        (value, self)
+        (build_eq(self.builder, lhs, rhs), self)
     }
 
     pub fn build_load<T: ValueType>(self, ptr: &Value<*mut T>) -> (Value<T>, Self) {
-        let value = unsafe {
-            let name = CString::new("").unwrap();
-
-            Value::new(LLVMBuildLoad2(
-                self.builder,
-                T::value_type(),
-                ptr.value(),
-                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
-            ))
-        };
-
-        (value, self)
+        (build_load(self.builder, ptr), self)
     }
 
     pub fn build_store<T: ValueType>(self, ptr: &Value<*mut T>, value: &Value<T>) -> Self {
-        unsafe {
-            LLVMBuildStore(self.builder, value.value(), ptr.value());
-        }
-
+        build_store(self.builder, ptr, value);
         self
     }
 
@@ -121,32 +66,7 @@ impl Builder {
         array: &Value<*mut [T; N]>,
         index: &Value<I>,
     ) -> (Value<T>, Self) {
-        let ep = unsafe {
-            let name = CString::new("").unwrap();
-            let mut indices = [I::zero(), index.value()];
-
-            LLVMBuildGEP2(
-                self.builder,
-                <[T; N] as ValueType>::value_type(),
-                array.value(),
-                indices.as_mut_ptr(),
-                2,
-                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
-            )
-        };
-
-        let value = unsafe {
-            let name = CString::new("").unwrap();
-
-            Value::new(LLVMBuildLoad2(
-                self.builder,
-                T::value_type(),
-                ep,
-                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
-            ))
-        };
-
-        (value, self)
+        (build_index_load(self.builder, array, index), self)
     }
 
     pub fn build_index_store<T: ValueType, const N: usize, I: Integer>(
@@ -155,24 +75,7 @@ impl Builder {
         index: &Value<I>,
         value: &Value<T>,
     ) -> Self {
-        let ep = unsafe {
-            let name = CString::new("").unwrap();
-            let mut indices = [I::zero(), index.value()];
-
-            LLVMBuildGEP2(
-                self.builder,
-                <[T; N] as ValueType>::value_type(),
-                array.value(),
-                indices.as_mut_ptr(),
-                2,
-                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
-            )
-        };
-
-        unsafe {
-            LLVMBuildStore(self.builder, value.value(), ep);
-        }
-
+        build_index_store(self.builder, array, index, value);
         self
     }
 
@@ -181,46 +84,7 @@ impl Builder {
         a: &Value<A>,
         b: &Value<B>,
     ) -> (Value<*mut (A, B)>, Self) {
-        let value = unsafe {
-            let name = CString::new("").unwrap();
-
-            LLVMBuildAlloca(
-                self.builder,
-                <(A, B) as ValueType>::value_type(),
-                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
-            )
-        };
-
-        let first_ep = unsafe {
-            let name = CString::new("").unwrap();
-
-            LLVMBuildStructGEP2(
-                self.builder,
-                <(A, B) as ValueType>::value_type(),
-                value,
-                0,
-                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
-            )
-        };
-
-        let second_ep = unsafe {
-            let name = CString::new("").unwrap();
-
-            LLVMBuildStructGEP2(
-                self.builder,
-                <(A, B) as ValueType>::value_type(),
-                value,
-                1,
-                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
-            )
-        };
-
-        unsafe {
-            LLVMBuildStore(self.builder, a.value(), first_ep);
-            LLVMBuildStore(self.builder, b.value(), second_ep);
-        }
-
-        (Value::new(value), self)
+        (build_struct(self.builder, a, b), self)
     }
 
     pub fn build_jump_table<T: ValueType>(
@@ -232,42 +96,23 @@ impl Builder {
     }
 
     pub fn build_unreachable(self) {
-        unsafe {
-            LLVMBuildUnreachable(self.builder);
-        }
+        build_unreachable(self.builder);
     }
 
     pub fn build_jump(self, block: &Block) {
-        unsafe {
-            LLVMBuildBr(self.builder, block.value());
-        }
+        build_jump(self.builder, block);
     }
 
     pub fn build_conditional_jump<T: Integer>(self, value: &Value<T>, t: &Block, f: &Block) {
-        unsafe {
-            let zero = T::zero();
-            let name = CString::new("").unwrap();
-            let cmp = LLVMBuildICmp(
-                self.builder,
-                LLVMIntPredicate::LLVMIntEQ,
-                zero,
-                value.value(),
-                name.to_bytes_with_nul().as_ptr().cast::<i8>(),
-            );
-            LLVMBuildCondBr(self.builder, cmp, t.value(), f.value());
-        }
+        build_conditional_jump(self.builder, value, t, f);
     }
 
     pub fn build_ret<T: ValueType>(self, value: &Value<T>) {
-        unsafe {
-            LLVMBuildRet(self.builder, value.value());
-        }
+        build_ret(self.builder, value);
     }
 
     pub fn build_void_ret(self) {
-        unsafe {
-            LLVMBuildRetVoid(self.builder);
-        }
+        build_void_ret(self.builder);
     }
 }
 
@@ -276,5 +121,236 @@ impl Drop for Builder {
         unsafe {
             LLVMDisposeBuilder(self.builder);
         }
+    }
+}
+
+fn build_call<T: FunctionType>(
+    builder: *mut LLVMBuilder,
+    function: &Function<T>,
+    params: T::Params,
+) -> T::Return {
+    function.build_call(builder, params)
+}
+
+fn build_add<T: Integer>(builder: *mut LLVMBuilder, lhs: &Value<T>, rhs: &Value<T>) -> Value<T> {
+    let value = unsafe {
+        let name = CString::new("").unwrap();
+
+        Value::new(LLVMBuildAdd(
+            builder,
+            lhs.value(),
+            rhs.value(),
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        ))
+    };
+
+    value
+}
+
+fn build_sub<T: Integer>(builder: *mut LLVMBuilder, lhs: &Value<T>, rhs: &Value<T>) -> Value<T> {
+    let value = unsafe {
+        let name = CString::new("").unwrap();
+
+        Value::new(LLVMBuildSub(
+            builder,
+            lhs.value(),
+            rhs.value(),
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        ))
+    };
+
+    value
+}
+
+fn build_eq<T: Integer>(builder: *mut LLVMBuilder, lhs: &Value<T>, rhs: &Value<T>) -> Value<T> {
+    let value = unsafe {
+        let name = CString::new("").unwrap();
+
+        let result = LLVMBuildICmp(
+            builder,
+            LLVMIntPredicate::LLVMIntEQ,
+            lhs.value(),
+            rhs.value(),
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        );
+
+        Value::new(LLVMBuildIntCast(
+            builder,
+            result,
+            T::value_type(),
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        ))
+    };
+
+    value
+}
+
+fn build_load<T: ValueType>(builder: *mut LLVMBuilder, ptr: &Value<*mut T>) -> Value<T> {
+    let value = unsafe {
+        let name = CString::new("").unwrap();
+
+        Value::new(LLVMBuildLoad2(
+            builder,
+            T::value_type(),
+            ptr.value(),
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        ))
+    };
+
+    value
+}
+
+fn build_store<T: ValueType>(builder: *mut LLVMBuilder, ptr: &Value<*mut T>, value: &Value<T>) {
+    unsafe {
+        LLVMBuildStore(builder, value.value(), ptr.value());
+    }
+}
+
+fn build_index_load<T: ValueType, const N: usize, I: Integer>(
+    builder: *mut LLVMBuilder,
+    array: &Value<*mut [T; N]>,
+    index: &Value<I>,
+) -> Value<T> {
+    let ep = unsafe {
+        let name = CString::new("").unwrap();
+        let mut indices = [I::zero(), index.value()];
+
+        LLVMBuildGEP2(
+            builder,
+            <[T; N] as ValueType>::value_type(),
+            array.value(),
+            indices.as_mut_ptr(),
+            2,
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        )
+    };
+
+    let value = unsafe {
+        let name = CString::new("").unwrap();
+
+        Value::new(LLVMBuildLoad2(
+            builder,
+            T::value_type(),
+            ep,
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        ))
+    };
+
+    value
+}
+
+fn build_index_store<T: ValueType, const N: usize, I: Integer>(
+    builder: *mut LLVMBuilder,
+    array: &Value<*mut [T; N]>,
+    index: &Value<I>,
+    value: &Value<T>,
+) {
+    let ep = unsafe {
+        let name = CString::new("").unwrap();
+        let mut indices = [I::zero(), index.value()];
+
+        LLVMBuildGEP2(
+            builder,
+            <[T; N] as ValueType>::value_type(),
+            array.value(),
+            indices.as_mut_ptr(),
+            2,
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        )
+    };
+
+    unsafe {
+        LLVMBuildStore(builder, value.value(), ep);
+    }
+}
+
+fn build_struct<A: ValueType, B: ValueType>(
+    builder: *mut LLVMBuilder,
+    a: &Value<A>,
+    b: &Value<B>,
+) -> Value<*mut (A, B)> {
+    let value = unsafe {
+        let name = CString::new("").unwrap();
+
+        LLVMBuildAlloca(
+            builder,
+            <(A, B) as ValueType>::value_type(),
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        )
+    };
+
+    let first_ep = unsafe {
+        let name = CString::new("").unwrap();
+
+        LLVMBuildStructGEP2(
+            builder,
+            <(A, B) as ValueType>::value_type(),
+            value,
+            0,
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        )
+    };
+
+    let second_ep = unsafe {
+        let name = CString::new("").unwrap();
+
+        LLVMBuildStructGEP2(
+            builder,
+            <(A, B) as ValueType>::value_type(),
+            value,
+            1,
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        )
+    };
+
+    unsafe {
+        LLVMBuildStore(builder, a.value(), first_ep);
+        LLVMBuildStore(builder, b.value(), second_ep);
+    }
+
+    Value::new(value)
+}
+
+fn build_unreachable(builder: *mut LLVMBuilder) {
+    unsafe {
+        LLVMBuildUnreachable(builder);
+    }
+}
+
+fn build_jump(builder: *mut LLVMBuilder, block: &Block) {
+    unsafe {
+        LLVMBuildBr(builder, block.value());
+    }
+}
+
+fn build_conditional_jump<T: Integer>(
+    builder: *mut LLVMBuilder,
+    value: &Value<T>,
+    t: &Block,
+    f: &Block,
+) {
+    unsafe {
+        let zero = T::zero();
+        let name = CString::new("").unwrap();
+        let cmp = LLVMBuildICmp(
+            builder,
+            LLVMIntPredicate::LLVMIntEQ,
+            zero,
+            value.value(),
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        );
+        LLVMBuildCondBr(builder, cmp, t.value(), f.value());
+    }
+}
+
+fn build_ret<T: ValueType>(builder: *mut LLVMBuilder, value: &Value<T>) {
+    unsafe {
+        LLVMBuildRet(builder, value.value());
+    }
+}
+
+fn build_void_ret(builder: *mut LLVMBuilder) {
+    unsafe {
+        LLVMBuildRetVoid(builder);
     }
 }
