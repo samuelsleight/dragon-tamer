@@ -33,11 +33,21 @@ constant!(i64);
 constant!(u32);
 constant!(u64);
 
-#[derive(Copy, Clone)]
 pub struct Value<T: ValueType + ?Sized> {
     value: *mut LLVMValue,
-    phantom: PhantomData<T>,
+    phantom: PhantomData<*mut T>,
 }
+
+impl<T: ValueType + ?Sized> Clone for Value<T> {
+    fn clone(&self) -> Self {
+        Self {
+            value: self.value,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<T: ValueType + ?Sized> Copy for Value<T> {}
 
 impl<T: ValueType + ?Sized> Value<T> {
     pub fn new(value: *mut LLVMValue) -> Self {
