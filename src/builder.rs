@@ -52,6 +52,10 @@ impl Builder {
         (build_eq(self.builder, lhs, rhs), self)
     }
 
+    pub fn build_lt<T: Integer>(self, lhs: &Value<T>, rhs: &Value<T>) -> (Value<T>, Self) {
+        (build_lt(self.builder, lhs, rhs), self)
+    }
+
     pub fn build_load<T: ValueType>(self, ptr: &Value<*mut T>) -> (Value<T>, Self) {
         (build_load(self.builder, ptr), self)
     }
@@ -169,6 +173,29 @@ fn build_eq<T: Integer>(builder: *mut LLVMBuilder, lhs: &Value<T>, rhs: &Value<T
         let result = LLVMBuildICmp(
             builder,
             LLVMIntPredicate::LLVMIntEQ,
+            lhs.value(),
+            rhs.value(),
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        );
+
+        Value::new(LLVMBuildIntCast(
+            builder,
+            result,
+            T::value_type(),
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        ))
+    };
+
+    value
+}
+
+fn build_lt<T: Integer>(builder: *mut LLVMBuilder, lhs: &Value<T>, rhs: &Value<T>) -> Value<T> {
+    let value = unsafe {
+        let name = CString::new("").unwrap();
+
+        let result = LLVMBuildICmp(
+            builder,
+            LLVMIntPredicate::LLVMIntSLT,
             lhs.value(),
             rhs.value(),
             name.to_bytes_with_nul().as_ptr().cast::<i8>(),
