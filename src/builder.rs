@@ -3,9 +3,9 @@ use std::ffi::CString;
 use llvm_sys::{
     core::{
         LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildBr, LLVMBuildCondBr, LLVMBuildGEP2, LLVMBuildICmp,
-        LLVMBuildIntCast, LLVMBuildLoad2, LLVMBuildRet, LLVMBuildRetVoid, LLVMBuildStore,
-        LLVMBuildStructGEP2, LLVMBuildSub, LLVMBuildUnreachable, LLVMCreateBuilder,
-        LLVMDisposeBuilder,
+        LLVMBuildIntCast, LLVMBuildLoad2, LLVMBuildRet, LLVMBuildRetVoid, LLVMBuildSelect,
+        LLVMBuildStore, LLVMBuildStructGEP2, LLVMBuildSub, LLVMBuildUnreachable, LLVMCreateBuilder,
+        LLVMDisposeBuilder, LLVMInt1Type,
     },
     LLVMBuilder, LLVMIntPredicate,
 };
@@ -54,6 +54,15 @@ impl Builder {
 
     pub fn build_lt<T: Integer>(self, lhs: &Value<T>, rhs: &Value<T>) -> (Value<T>, Self) {
         (build_lt(self.builder, lhs, rhs), self)
+    }
+
+    pub fn build_conditional_value<T: Integer, U: ValueType>(
+        self,
+        value: &Value<T>,
+        t: &Value<U>,
+        f: &Value<U>,
+    ) -> (Value<U>, Self) {
+        (build_conditional_value(self.builder, value, t, f), self)
     }
 
     pub fn build_load<T: ValueType>(self, ptr: &Value<*mut T>) -> (Value<T>, Self) {
@@ -205,6 +214,34 @@ fn build_lt<T: Integer>(builder: *mut LLVMBuilder, lhs: &Value<T>, rhs: &Value<T
             builder,
             result,
             T::value_type(),
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        ))
+    };
+
+    value
+}
+
+fn build_conditional_value<T: Integer, U: ValueType>(
+    builder: *mut LLVMBuilder,
+    value: &Value<T>,
+    t: &Value<U>,
+    f: &Value<U>,
+) -> Value<U> {
+    let value = unsafe {
+        let name = CString::new("").unwrap();
+
+        let cast = LLVMBuildIntCast(
+            builder,
+            value.value(),
+            LLVMInt1Type(),
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        );
+
+        Value::new(LLVMBuildSelect(
+            builder,
+            cast,
+            t.value(),
+            f.value(),
             name.to_bytes_with_nul().as_ptr().cast::<i8>(),
         ))
     };
