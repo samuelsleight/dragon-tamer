@@ -10,7 +10,16 @@ use llvm_sys::{
     LLVMBuilder, LLVMType, LLVMValue,
 };
 
-use crate::{Function, Value};
+use crate::{value::UntypedValue, Function, Value};
+
+pub struct Variadic;
+
+pub trait ValueType {
+    type ReturnType;
+
+    fn value_type() -> *mut LLVMType;
+    fn as_return_value(builder: *mut LLVMBuilder, value: *mut LLVMValue) -> Self::ReturnType;
+}
 
 pub trait FunctionType {
     type Params;
@@ -27,11 +36,13 @@ pub trait FunctionType {
     ) -> Self::Return;
 }
 
-pub trait ValueType {
-    type ReturnType;
-
-    fn value_type() -> *mut LLVMType;
-    fn as_return_value(builder: *mut LLVMBuilder, value: *mut LLVMValue) -> Self::ReturnType;
+pub trait VariadicFunctionType: FunctionType {
+    fn build_variadic_call(
+        builder: *mut LLVMBuilder,
+        function: *mut LLVMValue,
+        params: Self::Params,
+        variadic_params: &[UntypedValue],
+    ) -> Self::Return;
 }
 
 macro_rules! value_type {
@@ -142,8 +153,15 @@ impl<A: ValueType, B: ValueType> ValueType for (A, B) {
     }
 }
 
-fn function_type(ret: *mut LLVMType, params: &[*mut LLVMType]) -> *mut LLVMType {
-    unsafe { LLVMFunctionType(ret, params.as_ptr() as *mut _, params.len() as u32, 0) }
+fn function_type(ret: *mut LLVMType, params: &[*mut LLVMType], variadic: bool) -> *mut LLVMType {
+    unsafe {
+        LLVMFunctionType(
+            ret,
+            params.as_ptr() as *mut _,
+            params.len() as u32,
+            if variadic { 1 } else { 0 },
+        )
+    }
 }
 
 fn build_call(
@@ -173,7 +191,7 @@ where
     type Return = R::ReturnType;
 
     fn function_type() -> *mut LLVMType {
-        function_type(R::value_type(), &[])
+        function_type(R::value_type(), &[], false)
     }
 
     fn function_params(_: *mut LLVMValue) -> Self::Params {}
@@ -199,7 +217,7 @@ where
     type Return = R::ReturnType;
 
     fn function_type() -> *mut LLVMType {
-        function_type(R::value_type(), &[T::value_type()])
+        function_type(R::value_type(), &[T::value_type()], false)
     }
 
     fn function_params(function: *mut LLVMValue) -> Self::Params {
@@ -219,6 +237,61 @@ where
                 Self::function_type(),
                 &[params.0.value()],
             ),
+        )
+    }
+}
+
+impl<T, R> FunctionType for fn(T, Variadic) -> R
+where
+    R: ValueType,
+    T: ValueType,
+{
+    type Params = (Value<T>,);
+    type Return = R::ReturnType;
+
+    fn function_type() -> *mut LLVMType {
+        function_type(R::value_type(), &[T::value_type()], true)
+    }
+
+    fn function_params(function: *mut LLVMValue) -> Self::Params {
+        unsafe { (Value::new(LLVMGetParam(function, 0)),) }
+    }
+
+    fn build_call(
+        builder: *mut LLVMBuilder,
+        function: *mut LLVMValue,
+        params: Self::Params,
+    ) -> Self::Return {
+        R::as_return_value(
+            builder,
+            build_call(
+                builder,
+                function,
+                Self::function_type(),
+                &[params.0.value()],
+            ),
+        )
+    }
+}
+
+impl<T, R> VariadicFunctionType for fn(T, Variadic) -> R
+where
+    R: ValueType,
+    T: ValueType,
+{
+    fn build_variadic_call(
+        builder: *mut LLVMBuilder,
+        function: *mut LLVMValue,
+        params: Self::Params,
+        variadic_params: &[UntypedValue],
+    ) -> Self::Return {
+        let mut all_params = Vec::with_capacity(1 + variadic_params.len());
+        all_params.push(params.0.value());
+        all_params.extend(variadic_params.iter().map(UntypedValue::value));
+
+        R::as_return_value(
+            builder,
+            build_call(builder, function, Self::function_type(), &all_params),
         )
     }
 }

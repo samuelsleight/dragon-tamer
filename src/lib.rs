@@ -11,4 +11,4 @@ pub use self::builder::Builder;
 pub use self::function::Function;
 pub use self::module::Module;
 pub use self::types::*;
-pub use self::value::Value;
+pub use self::value::{UntypedValue, Value};

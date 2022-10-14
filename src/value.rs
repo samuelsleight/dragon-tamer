@@ -34,6 +34,17 @@ constant!(u32);
 constant!(u64);
 
 #[derive(Copy, Clone)]
+pub struct UntypedValue {
+    value: *mut LLVMValue,
+}
+
+impl UntypedValue {
+    pub(crate) fn value(&self) -> *mut LLVMValue {
+        self.value
+    }
+}
+
+#[derive(Copy, Clone)]
 pub struct Value<T: ValueType + ?Sized> {
     value: *mut LLVMValue,
     phantom: PhantomData<T>,
@@ -55,6 +66,10 @@ impl<T: ValueType + ?Sized> Value<T> {
             value: t.constant(),
             phantom: PhantomData,
         }
+    }
+
+    pub fn untyped(&self) -> UntypedValue {
+        UntypedValue { value: self.value }
     }
 
     pub(crate) fn value(&self) -> *mut LLVMValue {

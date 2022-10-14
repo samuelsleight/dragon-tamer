@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use llvm_sys::{core::LLVMAppendBasicBlock, LLVMBuilder, LLVMValue};
 
-use crate::{Block, FunctionType, Value, ValueType};
+use crate::{value::UntypedValue, Block, FunctionType, Value, ValueType, VariadicFunctionType};
 
 use std::ffi::CString;
 
@@ -22,6 +22,18 @@ impl<T: FunctionType> Function<T> {
 
     pub(crate) fn build_call(&self, builder: *mut LLVMBuilder, params: T::Params) -> T::Return {
         T::build_call(builder, self.value, params)
+    }
+
+    pub(crate) fn build_variadic_call(
+        &self,
+        builder: *mut LLVMBuilder,
+        params: T::Params,
+        variadic_params: &[UntypedValue],
+    ) -> T::Return
+    where
+        T: VariadicFunctionType,
+    {
+        T::build_variadic_call(builder, self.value, params, variadic_params)
     }
 
     pub fn params(&self) -> T::Params {

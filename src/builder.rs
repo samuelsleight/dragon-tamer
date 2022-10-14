@@ -11,7 +11,9 @@ use llvm_sys::{
 };
 
 use crate::{
-    jump_table::JumpTable, value::Integer, Block, Function, FunctionType, Value, ValueType,
+    jump_table::JumpTable,
+    value::{Integer, UntypedValue},
+    Block, Function, FunctionType, Value, ValueType, VariadicFunctionType,
 };
 
 #[must_use]
@@ -38,6 +40,18 @@ impl Builder {
         params: T::Params,
     ) -> (T::Return, Self) {
         (build_call(self.builder, function, params), self)
+    }
+
+    pub fn build_variadic_call<T: VariadicFunctionType>(
+        self,
+        function: &Function<T>,
+        params: T::Params,
+        variadic_params: &[UntypedValue],
+    ) -> (T::Return, Self) {
+        (
+            build_variadic_call(self.builder, function, params, variadic_params),
+            self,
+        )
     }
 
     pub fn build_add<T: Integer>(self, lhs: &Value<T>, rhs: &Value<T>) -> (Value<T>, Self) {
@@ -143,6 +157,15 @@ fn build_call<T: FunctionType>(
     params: T::Params,
 ) -> T::Return {
     function.build_call(builder, params)
+}
+
+fn build_variadic_call<T: VariadicFunctionType>(
+    builder: *mut LLVMBuilder,
+    function: &Function<T>,
+    params: T::Params,
+    variadic_params: &[UntypedValue],
+) -> T::Return {
+    function.build_variadic_call(builder, params, variadic_params)
 }
 
 fn build_add<T: Integer>(builder: *mut LLVMBuilder, lhs: &Value<T>, rhs: &Value<T>) -> Value<T> {
