@@ -54,6 +54,10 @@ impl Builder {
         )
     }
 
+    pub fn build_int_cast<T: Integer, U: Integer>(self, from: &Value<T>) -> (Value<U>, Self) {
+        (build_int_cast(self.builder, from), self)
+    }
+
     pub fn build_add<T: Integer>(self, lhs: &Value<T>, rhs: &Value<T>) -> (Value<T>, Self) {
         (build_add(self.builder, lhs, rhs), self)
     }
@@ -166,6 +170,21 @@ fn build_variadic_call<T: VariadicFunctionType>(
     variadic_params: &[UntypedValue],
 ) -> T::Return {
     function.build_variadic_call(builder, params, variadic_params)
+}
+
+fn build_int_cast<T: Integer, U: Integer>(builder: *mut LLVMBuilder, from: &Value<T>) -> Value<U> {
+    let value = unsafe {
+        let name = CString::new("").unwrap();
+
+        Value::new(LLVMBuildIntCast(
+            builder,
+            from.value(),
+            U::value_type(),
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        ))
+    };
+
+    value
 }
 
 fn build_add<T: Integer>(builder: *mut LLVMBuilder, lhs: &Value<T>, rhs: &Value<T>) -> Value<T> {
