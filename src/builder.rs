@@ -4,8 +4,8 @@ use llvm_sys::{
     core::{
         LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildBr, LLVMBuildCondBr, LLVMBuildGEP2, LLVMBuildICmp,
         LLVMBuildIntCast, LLVMBuildLoad2, LLVMBuildMul, LLVMBuildRet, LLVMBuildRetVoid,
-        LLVMBuildSelect, LLVMBuildStore, LLVMBuildStructGEP2, LLVMBuildSub, LLVMBuildUnreachable,
-        LLVMCreateBuilder, LLVMDisposeBuilder, LLVMInt1Type,
+        LLVMBuildSDiv, LLVMBuildSelect, LLVMBuildStore, LLVMBuildStructGEP2, LLVMBuildSub,
+        LLVMBuildUnreachable, LLVMCreateBuilder, LLVMDisposeBuilder, LLVMInt1Type,
     },
     LLVMBuilder, LLVMIntPredicate,
 };
@@ -68,6 +68,10 @@ impl Builder {
 
     pub fn build_mul<T: Integer>(self, lhs: &Value<T>, rhs: &Value<T>) -> (Value<T>, Self) {
         (build_mul(self.builder, lhs, rhs), self)
+    }
+
+    pub fn build_sdiv<T: Integer>(self, lhs: &Value<T>, rhs: &Value<T>) -> (Value<T>, Self) {
+        (build_sdiv(self.builder, lhs, rhs), self)
     }
 
     pub fn build_eq<T: Integer>(self, lhs: &Value<T>, rhs: &Value<T>) -> (Value<T>, Self) {
@@ -226,6 +230,21 @@ fn build_mul<T: Integer>(builder: *mut LLVMBuilder, lhs: &Value<T>, rhs: &Value<
         let name = CString::new("").unwrap();
 
         Value::new(LLVMBuildMul(
+            builder,
+            lhs.value(),
+            rhs.value(),
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        ))
+    };
+
+    value
+}
+
+fn build_sdiv<T: Integer>(builder: *mut LLVMBuilder, lhs: &Value<T>, rhs: &Value<T>) -> Value<T> {
+    let value = unsafe {
+        let name = CString::new("").unwrap();
+
+        Value::new(LLVMBuildSDiv(
             builder,
             lhs.value(),
             rhs.value(),
