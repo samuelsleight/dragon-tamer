@@ -82,6 +82,10 @@ impl Builder {
         (build_lt(self.builder, lhs, rhs), self)
     }
 
+    pub fn build_gt<T: Integer>(self, lhs: &Value<T>, rhs: &Value<T>) -> (Value<T>, Self) {
+        (build_gt(self.builder, lhs, rhs), self)
+    }
+
     pub fn build_conditional_value<T: Integer, U: ValueType>(
         self,
         value: &Value<T>,
@@ -285,6 +289,29 @@ fn build_lt<T: Integer>(builder: *mut LLVMBuilder, lhs: &Value<T>, rhs: &Value<T
         let result = LLVMBuildICmp(
             builder,
             LLVMIntPredicate::LLVMIntSLT,
+            lhs.value(),
+            rhs.value(),
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        );
+
+        Value::new(LLVMBuildIntCast(
+            builder,
+            result,
+            T::value_type(),
+            name.to_bytes_with_nul().as_ptr().cast::<i8>(),
+        ))
+    };
+
+    value
+}
+
+fn build_gt<T: Integer>(builder: *mut LLVMBuilder, lhs: &Value<T>, rhs: &Value<T>) -> Value<T> {
+    let value = unsafe {
+        let name = CString::new("").unwrap();
+
+        let result = LLVMBuildICmp(
+            builder,
+            LLVMIntPredicate::LLVMIntSGT,
             lhs.value(),
             rhs.value(),
             name.to_bytes_with_nul().as_ptr().cast::<i8>(),
