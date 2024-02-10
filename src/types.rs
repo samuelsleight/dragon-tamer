@@ -241,6 +241,45 @@ where
     }
 }
 
+impl<T, U, R> FunctionType for fn(T, U) -> R
+where
+    T: ValueType,
+    U: ValueType,
+    R: ValueType,
+{
+    type Params = (Value<T>, Value<U>);
+    type Return = R::ReturnType;
+
+    fn function_type() -> *mut LLVMType {
+        function_type(R::value_type(), &[T::value_type(), U::value_type()], false)
+    }
+
+    fn function_params(function: *mut LLVMValue) -> Self::Params {
+        unsafe {
+            (
+                Value::new(LLVMGetParam(function, 0)),
+                Value::new(LLVMGetParam(function, 1)),
+            )
+        }
+    }
+
+    fn build_call(
+        builder: *mut LLVMBuilder,
+        function: *mut LLVMValue,
+        params: Self::Params,
+    ) -> Self::Return {
+        R::as_return_value(
+            builder,
+            build_call(
+                builder,
+                function,
+                Self::function_type(),
+                &[params.0.value(), params.1.value()],
+            ),
+        )
+    }
+}
+
 impl<T, R> FunctionType for fn(T, Variadic) -> R
 where
     R: ValueType,
