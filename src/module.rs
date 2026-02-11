@@ -6,7 +6,7 @@ use std::{
 
 use llvm_sys::{
     core::{
-        LLVMAddFunction, LLVMAddGlobal, LLVMArrayType, LLVMConstArray, LLVMConstBitCast,
+        LLVMAddFunction, LLVMAddGlobal, LLVMArrayType2, LLVMConstArray2, LLVMConstBitCast,
         LLVMConstString, LLVMDisposeMessage, LLVMDisposeModule, LLVMInt8Type,
         LLVMModuleCreateWithName, LLVMPrintModuleToString, LLVMSetGlobalConstant,
         LLVMSetInitializer, LLVMSetLinkage, LLVMSetSourceFileName,
@@ -80,7 +80,7 @@ impl Module {
             unsafe {
                 LLVMAddGlobal(
                     self.module,
-                    LLVMArrayType(LLVMInt8Type(), bytes.len() as u32),
+                    LLVMArrayType2(LLVMInt8Type(), bytes.len() as u64),
                     name.to_bytes_with_nul().as_ptr().cast::<i8>(),
                 )
             }
@@ -104,7 +104,7 @@ impl Module {
             unsafe {
                 LLVMAddGlobal(
                     self.module,
-                    LLVMArrayType(T::value_type(), N as u32),
+                    LLVMArrayType2(T::value_type(), N as u64),
                     name.to_bytes_with_nul().as_ptr().cast::<i8>(),
                 )
             }
@@ -115,7 +115,7 @@ impl Module {
             LLVMSetGlobalConstant(global, 0);
 
             let mut vals = [T::zero(); N];
-            let value = LLVMConstArray(T::value_type(), vals.as_mut_ptr(), N as u32);
+            let value = LLVMConstArray2(T::value_type(), vals.as_mut_ptr(), N as u64);
             LLVMSetInitializer(global, value);
 
             Value::new(global)

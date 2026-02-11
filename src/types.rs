@@ -4,7 +4,7 @@ use std::ffi::CString;
 
 use llvm_sys::{
     core::{
-        LLVMArrayType, LLVMBuildCall2, LLVMBuildExtractValue, LLVMFunctionType, LLVMGetParam,
+        LLVMArrayType2, LLVMBuildCall2, LLVMBuildExtractValue, LLVMFunctionType, LLVMGetParam,
         LLVMInt32Type, LLVMInt64Type, LLVMInt8Type, LLVMPointerType, LLVMStructType, LLVMVoidType,
     },
     LLVMBuilder, LLVMType, LLVMValue,
@@ -93,7 +93,7 @@ impl<T: ValueType, const N: usize> ValueType for [T; N] {
     type ReturnType = Value<[T; N]>;
 
     fn value_type() -> *mut LLVMType {
-        unsafe { LLVMArrayType(T::value_type(), N as u32) }
+        unsafe { LLVMArrayType2(T::value_type(), N as u64) }
     }
 
     fn as_return_value(_: *mut LLVMBuilder, value: *mut LLVMValue) -> Self::ReturnType {
