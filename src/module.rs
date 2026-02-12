@@ -70,12 +70,16 @@ impl Module {
         Function::new(function)
     }
 
-    pub fn add_string<S: AsRef<str>>(&self, string: S) -> Value<String> {
-        let cstring = CString::new(string.as_ref()).unwrap();
+    pub fn add_named_string<S1: AsRef<str>, S2: AsRef<str>>(
+        &self,
+        name: S1,
+        value: S2,
+    ) -> Value<String> {
+        let cstring = CString::new(value.as_ref()).unwrap();
         let bytes = cstring.to_bytes_with_nul();
 
         let global = {
-            let name = CString::new("string").unwrap();
+            let name = CString::new(name.as_ref()).unwrap();
 
             unsafe {
                 LLVMAddGlobal(
@@ -97,9 +101,16 @@ impl Module {
         }
     }
 
-    pub fn add_array<T: Integer, const N: usize>(&self) -> Value<*mut [T; N]> {
+    pub fn add_string<S: AsRef<str>>(&self, value: S) -> Value<String> {
+        self.add_named_string("string", value)
+    }
+
+    pub fn add_named_array<S: AsRef<str>, T: Integer, const N: usize>(
+        &self,
+        name: S,
+    ) -> Value<*mut [T; N]> {
         let global = {
-            let name = CString::new("array").unwrap();
+            let name = CString::new(name.as_ref()).unwrap();
 
             unsafe {
                 LLVMAddGlobal(
@@ -122,9 +133,17 @@ impl Module {
         }
     }
 
-    pub fn add_global<T: ValueType + Constant>(&self, value: T) -> Value<*mut T> {
+    pub fn add_array<T: Integer, const N: usize>(&self) -> Value<*mut [T; N]> {
+        self.add_named_array("array")
+    }
+
+    pub fn add_named_global<S: AsRef<str>, T: ValueType + Constant>(
+        &self,
+        name: S,
+        value: T,
+    ) -> Value<*mut T> {
         let global = {
-            let name = CString::new("value").unwrap();
+            let name = CString::new(name.as_ref()).unwrap();
 
             unsafe {
                 LLVMAddGlobal(
@@ -144,6 +163,10 @@ impl Module {
 
             Value::new(global)
         }
+    }
+
+    pub fn add_global<T: ValueType + Constant>(&self, value: T) -> Value<*mut T> {
+        self.add_named_global("global", value)
     }
 }
 
