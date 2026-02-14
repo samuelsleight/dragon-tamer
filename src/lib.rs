@@ -9,6 +9,6 @@ mod value;
 pub use self::block::Block;
 pub use self::builder::Builder;
 pub use self::function::Function;
-pub use self::module::Module;
+pub use self::module::{CompileOutput, Module, OutputFile};
 pub use self::types::*;
 pub use self::value::{UntypedValue, Value};

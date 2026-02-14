@@ -1,18 +1,30 @@
 use std::{
     ffi::{CStr, CString},
     fmt::{self, Debug, Formatter},
-    path::Path,
+    path::{Path, PathBuf},
+    ptr::null_mut,
 };
 
 use llvm_sys::{
     core::{
         LLVMAddFunction, LLVMAddGlobal, LLVMArrayType2, LLVMConstArray2, LLVMConstBitCast,
-        LLVMConstString, LLVMDisposeMessage, LLVMDisposeModule, LLVMInt8Type,
-        LLVMModuleCreateWithName, LLVMPrintModuleToString, LLVMSetGlobalConstant,
+        LLVMConstString, LLVMDisposeMessage, LLVMDisposeModule, LLVMGetModuleIdentifier,
+        LLVMInt8Type, LLVMModuleCreateWithName, LLVMPrintModuleToString, LLVMSetGlobalConstant,
         LLVMSetInitializer, LLVMSetLinkage, LLVMSetSourceFileName,
+    },
+    target::{
+        LLVM_InitializeNativeAsmParser, LLVM_InitializeNativeAsmPrinter,
+        LLVM_InitializeNativeDisassembler, LLVM_InitializeNativeTarget,
+    },
+    target_machine::{
+        LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetMachine,
+        LLVMDisposeTargetMachine, LLVMGetDefaultTargetTriple, LLVMGetHostCPUFeatures,
+        LLVMGetHostCPUName, LLVMGetTargetFromTriple, LLVMRelocMode, LLVMTargetMachineEmitToFile,
+        LLVMTargetRef,
     },
     LLVMLinkage, LLVMModule,
 };
+use tempfile::{tempdir, TempDir};
 
 use crate::{
     types::ValueType,
@@ -20,8 +32,48 @@ use crate::{
     Function, FunctionType, Value,
 };
 
+#[derive(Clone, Copy)]
+pub enum CompileOutput {
+    Assembly,
+    Object,
+}
+
+pub struct OutputFile {
+    _dir: TempDir,
+    path: PathBuf,
+}
+
 pub struct Module {
     module: *mut LLVMModule,
+}
+
+impl CompileOutput {
+    fn file_type(&self) -> LLVMCodeGenFileType {
+        match self {
+            CompileOutput::Assembly => LLVMCodeGenFileType::LLVMAssemblyFile,
+            CompileOutput::Object => LLVMCodeGenFileType::LLVMObjectFile,
+        }
+    }
+
+    fn file_name(&self, module: *mut LLVMModule) -> String {
+        let module_name = unsafe {
+            let mut length = 0;
+            let name = LLVMGetModuleIdentifier(module, &mut length);
+            CStr::from_ptr(name).to_owned().into_string().unwrap()
+        };
+
+        module_name
+            + match self {
+                CompileOutput::Assembly => ".s",
+                CompileOutput::Object => ".o",
+            }
+    }
+}
+
+impl OutputFile {
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
 }
 
 impl Debug for Module {
@@ -167,6 +219,75 @@ impl Module {
 
     pub fn add_global<T: ValueType + Constant>(&self, value: T) -> Value<*mut T> {
         self.add_named_global("global", value)
+    }
+
+    pub fn compile_for_host(&self, output: CompileOutput) -> Result<OutputFile, String> {
+        unsafe {
+            LLVM_InitializeNativeTarget();
+            LLVM_InitializeNativeAsmParser();
+            LLVM_InitializeNativeAsmPrinter();
+            LLVM_InitializeNativeDisassembler();
+
+            let triple = LLVMGetDefaultTargetTriple();
+
+            let mut error_message: *mut i8 = null_mut();
+
+            let mut target: LLVMTargetRef = null_mut();
+            LLVMGetTargetFromTriple(triple, &mut target, &mut error_message as *mut _);
+
+            if !error_message.is_null() {
+                let string = CStr::from_ptr(error_message)
+                    .to_owned()
+                    .into_string()
+                    .unwrap();
+
+                LLVMDisposeMessage(error_message);
+                return Err(string);
+            }
+
+            let cpu = LLVMGetHostCPUName();
+            let features = LLVMGetHostCPUFeatures();
+
+            let machine = LLVMCreateTargetMachine(
+                target,
+                triple,
+                cpu,
+                features,
+                LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault,
+                LLVMRelocMode::LLVMRelocStatic,
+                LLVMCodeModel::LLVMCodeModelDefault,
+            );
+
+            LLVMDisposeMessage(cpu);
+            LLVMDisposeMessage(features);
+
+            let filename = output.file_name(self.module);
+
+            let dir = tempdir().map_err(|_| "Unable to create temporary directory")?;
+            let path = dir.path().join(filename);
+
+            LLVMTargetMachineEmitToFile(
+                machine,
+                self.module,
+                path.as_os_str().as_encoded_bytes().as_ptr() as *const _,
+                output.file_type(),
+                &mut error_message as *mut _,
+            );
+
+            if !error_message.is_null() {
+                let string = CStr::from_ptr(error_message)
+                    .to_owned()
+                    .into_string()
+                    .unwrap();
+
+                LLVMDisposeMessage(error_message);
+                return Err(string);
+            }
+
+            LLVMDisposeTargetMachine(machine);
+
+            Ok(OutputFile { _dir: dir, path })
+        }
     }
 }
 
